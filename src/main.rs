@@ -1,6 +1,11 @@
+use atty::Stream;
 use gif::{Frame, Encoder, Repeat, SetParameter};
-use std::fs::File;
 use std::env;
+use std::fs::File;
+use std::io::stdout;
+use std::io::Write;
+use std::mem;
+use std::process;
 
 
 fn get_all_same<I, T>(mut iterator: I) -> Option<T>
@@ -26,6 +31,16 @@ where I: Iterator,
 
 
 fn main() {
+    if atty::is(Stream::Stdout) {
+        println!(
+            "This command returns an image file. Your terminal likely cannot display it directly!"
+        );
+        println!(
+            "Redirect output to a file or `imgcat`. If you really want to see the bytes \
+            in your terminal pipe the result to `cat`."
+        );
+        std::process::exit(1);
+    }
     let mut readers = Vec::new();
     for arg in tail(env::args()) {
         let mut decoder = gif::Decoder::new(File::open(arg).unwrap());
@@ -39,7 +54,7 @@ fn main() {
     let width = get_all_same(readers.iter().map(|reader| reader.width())).unwrap();
     let height = get_all_same(readers.iter().map(|reader| reader.height())).unwrap();
 
-    let mut image = File::create("after.gif").unwrap();
+    let mut image = Vec::new();
     let mut encoder = Encoder::new(&mut image, width, height, &[]).unwrap();
 
     encoder.set(Repeat::Infinite).unwrap();
@@ -72,4 +87,6 @@ fn main() {
         composite_frame.delay = delay;
         encoder.write_frame(&composite_frame).unwrap();
     }
+    mem::drop(encoder);
+    stdout().write_all(&image).unwrap();
 }
