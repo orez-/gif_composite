@@ -5,7 +5,6 @@ use std::fs::File;
 use std::io::stdout;
 use std::io::Write;
 use std::mem;
-use std::process;
 
 
 fn get_all_same<I, T>(mut iterator: I) -> Option<T>
@@ -33,6 +32,17 @@ where
 
 
 fn main() {
+    if env::args().len() == 1 {
+        println!(
+            "Pass at least two gifs to composite together. Gifs are layered in the order \
+            they're passed: first on bottom, last on top."
+        );
+        println!(
+            "All image files must be the same width and height, and be aligned in \
+            frame duration and count."
+        );
+        return;
+    }
     if atty::is(Stream::Stdout) {
         println!(
             "This command returns an image file. Your terminal likely cannot display it directly!"
@@ -45,7 +55,13 @@ fn main() {
     }
     let mut readers = Vec::new();
     for arg in tail(env::args()) {
-        let mut decoder = gif::Decoder::new(File::open(arg).unwrap());
+        let mut decoder = match File::open(&arg) {
+            Ok(file) => gif::Decoder::new(file),
+            Err(msg) => {
+                eprintln!("{} - {}", arg, msg);
+                std::process::exit(1)
+            }
+        };
         // Configure the decoder such that it will expand the image to RGBA.
         decoder.set(gif::ColorOutput::RGBA);
         // Read the file header
@@ -69,7 +85,8 @@ fn main() {
             break;
         }
         if !maybe_frames.iter().all(|frame| frame.is_some()) {
-            panic!("frame mismatch");
+            eprintln!("frame count mismatch");
+            std::process::exit(1);
         }
         let frames: Vec<_> = maybe_frames
             .into_iter()
