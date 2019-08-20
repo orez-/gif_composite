@@ -9,13 +9,14 @@ use std::process;
 
 
 fn get_all_same<I, T>(mut iterator: I) -> Option<T>
-where I: Iterator<Item=T>,
-      T: PartialEq
+where
+    I: Iterator<Item = T>,
+    T: PartialEq,
 {
     let first = iterator.next()?;
     for item in iterator {
         if item != first {
-            return None
+            return None;
         }
     }
     Some(first)
@@ -23,7 +24,8 @@ where I: Iterator<Item=T>,
 
 
 fn tail<I>(mut iterator: I) -> I
-where I: Iterator,
+where
+    I: Iterator,
 {
     iterator.next();
     iterator
@@ -59,28 +61,35 @@ fn main() {
 
     encoder.set(Repeat::Infinite).unwrap();
     loop {
-        let maybe_frames: Vec<_> = readers.iter_mut().map(|reader| reader.read_next_frame().unwrap()).collect();
+        let maybe_frames: Vec<_> = readers
+            .iter_mut()
+            .map(|reader| reader.read_next_frame().unwrap())
+            .collect();
         if maybe_frames.iter().all(|frame| frame.is_none()) {
             break;
         }
         if !maybe_frames.iter().all(|frame| frame.is_some()) {
             panic!("frame mismatch");
         }
-        let frames: Vec<_> = maybe_frames.into_iter().map(|frame| frame.unwrap()).collect();
+        let frames: Vec<_> = maybe_frames
+            .into_iter()
+            .map(|frame| frame.unwrap())
+            .collect();
         let delay = get_all_same(frames.iter().map(|frame| frame.delay)).unwrap();
 
         let mut buffer = vec![0; width as usize * height as usize * 4];
         // paste each frame overtop the buffer.
         for frame in frames {
             let pixels = buffer.chunks_exact(4).zip(frame.buffer.chunks_exact(4));
-            buffer = pixels.flat_map(
-                |(left, right)|
-                match right[3] {
-                    0xFF => right,
-                    0x00 => left,
-                    bad => panic!("Can't handle alpha value of {:?}", bad)
-                }.to_vec()
-            ).collect();
+            buffer = pixels
+                .flat_map(|(left, right)| {
+                    match right[3] {
+                        0xFF => right,
+                        0x00 => left,
+                        bad => panic!("Can't handle alpha value of {:?}", bad),
+                    }.to_vec()
+                })
+                .collect();
         }
 
         let mut composite_frame = Frame::from_rgba(width, height, &mut buffer);
